@@ -1,0 +1,70 @@
+import numpy as np
+
+# Objective function: Rastrigin Function
+def rastrigin(x):
+    A = 10
+    return A * len(x) + sum([(xi**2 - A * np.cos(2 * np.pi * xi)) for xi in x])
+
+# Lévy flight: random step generation
+def levy_flight(dim):
+    beta = 1.5  # Lévy flight parameter
+    u = np.random.normal(0, 1, dim)
+    v = np.random.normal(0, 1, dim)
+    step = u / np.abs(v)**(1 / beta)  # Lévy step
+    return step
+
+# Cuckoo Search Algorithm
+def cuckoo_search(num_nests, max_iter, dim, lower_bound, upper_bound):
+    # Initialize nests (solutions)
+    nests = np.random.uniform(lower_bound, upper_bound, (num_nests, dim))
+    fitness = np.array([rastrigin(nest) for nest in nests])
+
+    # Best solution initialization
+    best_nest = nests[np.argmin(fitness)]
+    best_fitness = min(fitness)
+
+    for _ in range(max_iter):
+        # Generate new solutions via Lévy flight
+        for i in range(num_nests):
+            new_nest = nests[i] + levy_flight(dim)
+            new_nest = np.clip(new_nest, lower_bound, upper_bound)  # Stay within bounds
+
+            # Evaluate the new solution
+            new_fitness = rastrigin(new_nest)
+
+            # Replace the nest if the new solution is better
+            if new_fitness < fitness[i]:
+                nests[i] = new_nest
+                fitness[i] = new_fitness
+
+        # Update the best solution found
+        current_best_idx = np.argmin(fitness)
+        current_best_fitness = fitness[current_best_idx]
+        if current_best_fitness < best_fitness:
+            best_fitness = current_best_fitness
+            best_nest = nests[current_best_idx]
+
+        # Randomly abandon some of the worst nests
+        abandon_prob = 0.25  # Fraction of nests to abandon
+        worst_nests_idx = np.argsort(fitness)[-int(abandon_prob * num_nests):]
+        
+        # Replace worst nests with new random solutions
+        for idx in worst_nests_idx:
+            nests[idx] = np.random.uniform(lower_bound, upper_bound, dim)
+            fitness[idx] = rastrigin(nests[idx])
+
+    return best_nest, best_fitness
+
+# User input for parameters
+num_nests = int(input("Enter the number of nests (solutions): "))
+max_iter = int(input("Enter the number of iterations: "))
+dim = int(input("Enter the dimensionality of the problem (number of variables): "))
+lower_bound = float(input("Enter the lower bound of the search space: "))
+upper_bound = float(input("Enter the upper bound of the search space: "))
+
+# Run Cuckoo Search
+best_solution, best_value = cuckoo_search(num_nests, max_iter, dim, lower_bound, upper_bound)
+
+# Output the best solution found
+print("\nBest Solution:", best_solution)
+print("Best Objective Function Value:", best_value)
