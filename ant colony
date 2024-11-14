@@ -1,0 +1,109 @@
+import random
+import numpy as np
+import math
+
+# Euclidean distance function
+def euclidean_distance(city1, city2):
+    return math.sqrt((city1[0] - city2[0]) ** 2 + (city1[1] - city2[1]) ** 2)
+
+# ACO Algorithm for TSP with P_ij probability function
+def ant_colony_optimization(cities, num_ants, num_iterations, alpha, beta, evaporation_rate, pheromone_initial):
+    num_cities = len(cities)
+    
+    # Initialize pheromone matrix and visibility (1/distance)
+    pheromone = np.ones((num_cities, num_cities)) * pheromone_initial
+    visibility = np.zeros((num_cities, num_cities))
+    
+    for i in range(num_cities):
+        for j in range(num_cities):
+            if i != j:
+                visibility[i][j] = 1 / euclidean_distance(cities[i], cities[j])
+
+    best_route = None
+    best_route_length = float('inf')
+
+    for iteration in range(num_iterations):
+        all_routes = []
+        all_route_lengths = []
+
+        for ant in range(num_ants):
+            # Each ant starts at a random city
+            start_city = random.randint(0, num_cities - 1)
+            route = [start_city]
+            visited = set(route)
+
+            # Construct route
+            while len(route) < num_cities:
+                current_city = route[-1]
+                probabilities = []
+
+                # Calculate probability of moving to each city
+                for next_city in range(num_cities):
+                    if next_city not in visited:
+                        # Probability = pheromone^alpha * visibility^beta
+                        pheromone_factor = pheromone[current_city][next_city] ** alpha
+                        visibility_factor = visibility[current_city][next_city] ** beta
+                        probabilities.append(pheromone_factor * visibility_factor)
+                    else:
+                        probabilities.append(0)
+
+                total_probability = sum(probabilities)
+                
+                # Normalize the probabilities to get a valid probability distribution
+                probabilities = [prob / total_probability for prob in probabilities]
+
+                # Select next city based on probabilities using random choice
+                next_city = np.random.choice(range(num_cities), p=probabilities)
+                route.append(next_city)
+                visited.add(next_city)
+
+            # Calculate the length of the route
+            route_length = 0
+            for i in range(1, len(route)):
+                route_length += euclidean_distance(cities[route[i-1]], cities[route[i]])
+
+            # Update the best route found
+            all_routes.append(route)
+            all_route_lengths.append(route_length)
+
+            if route_length < best_route_length:
+                best_route_length = route_length
+                best_route = route
+
+        # Update pheromone levels based on all ants' routes
+        pheromone = (1 - evaporation_rate) * pheromone
+
+        for ant in range(num_ants):
+            route = all_routes[ant]
+            route_length = all_route_lengths[ant]
+            for i in range(1, len(route)):
+                pheromone[route[i-1]][route[i]] += 1 / route_length
+
+        # Print the best route in the current iteration
+        print(f"Iteration {iteration+1}/{num_iterations}: Best Route Length = {best_route_length}")
+
+    return best_route, best_route_length
+
+# Get user inputs
+num_cities = int(input("Enter the number of cities: "))
+cities = []
+
+# Get city coordinates
+for i in range(num_cities):
+    x, y = map(float, input(f"Enter the coordinates of city {i+1} (x, y): ").split())
+    cities.append((x, y))
+
+num_ants = int(input("Enter the number of ants: "))
+num_iterations = int(input("Enter the number of iterations: "))
+alpha = float(input("Enter the pheromone importance (alpha): "))
+beta = float(input("Enter the visibility importance (beta): "))
+evaporation_rate = float(input("Enter the pheromone evaporation rate (0-1): "))
+pheromone_initial = float(input("Enter the initial pheromone level: "))
+
+# Run ACO to find the best route
+best_route, best_route_length = ant_colony_optimization(
+    cities, num_ants, num_iterations, alpha, beta, evaporation_rate, pheromone_initial)
+
+# Display the best route found
+print("\nBest route found:", best_route)
+print("Best route length:", best_route_length)
