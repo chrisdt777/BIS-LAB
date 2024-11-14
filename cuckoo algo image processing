@@ -1,0 +1,103 @@
+import numpy as np
+import cv2
+from skimage.metrics import structural_similarity as ssim
+from scipy.ndimage import gaussian_filter
+
+# Objective function: Mean Squared Error (MSE)
+def mse(image1, image2):
+    return np.mean((image1 - image2) ** 2)
+
+# Cuckoo Search Algorithm for Image Denoising
+def cuckoo_search_image_denoising(image, noisy_image, num_nests, max_iter, lower_bound, upper_bound):
+    # Initialize nests: each nest represents a set of filter parameters
+    nests = np.random.uniform(lower_bound, upper_bound, (num_nests, 2))  # Two parameters: sigma and kernel size
+    fitness = np.array([compute_fitness(nest, noisy_image, image) for nest in nests])
+    
+    # Best solution initialization
+    best_nest = nests[np.argmin(fitness)]
+    best_fitness = min(fitness)
+
+    for _ in range(max_iter):
+        # Generate new solutions via Lévy flight
+        for i in range(num_nests):
+            new_nest = nests[i] + levy_flight(2)  # 2 because we have 2 parameters: sigma and kernel size
+            new_nest = np.clip(new_nest, lower_bound, upper_bound)  # Stay within bounds
+
+            # Evaluate the new solution (fitness is the MSE between denoised image and original image)
+            new_fitness = compute_fitness(new_nest, noisy_image, image)
+
+            # Replace the nest if the new solution is better
+            if new_fitness < fitness[i]:
+                nests[i] = new_nest
+                fitness[i] = new_fitness
+
+        # Update the best solution found
+        current_best_idx = np.argmin(fitness)
+        current_best_fitness = fitness[current_best_idx]
+        if current_best_fitness < best_fitness:
+            best_fitness = current_best_fitness
+            best_nest = nests[current_best_idx]
+
+        # Randomly abandon some of the worst nests
+        abandon_prob = 0.25  # Fraction of nests to abandon
+        worst_nests_idx = np.argsort(fitness)[-int(abandon_prob * num_nests):]
+        # Replace worst nests with new random solutions
+        for idx in worst_nests_idx:
+            nests[idx] = np.random.uniform(lower_bound, upper_bound, 2)  # New random filter parameters
+            fitness[idx] = compute_fitness(nests[idx], noisy_image, image)
+
+    # Best solution (filter parameters) found
+    best_sigma, best_kernel_size = best_nest
+    denoised_image = apply_filter(noisy_image, best_sigma, int(best_kernel_size))
+    
+    return denoised_image, best_nest, best_fitness
+
+# Fitness function: calculate MSE between denoised image and the original image
+def compute_fitness(filter_params, noisy_image, original_image):
+    sigma, kernel_size = filter_params
+    denoised_image = apply_filter(noisy_image, sigma, int(kernel_size))
+    return mse(denoised_image, original_image)
+
+# Apply Gaussian filter based on parameters (sigma and kernel size)
+def apply_filter(image, sigma, kernel_size):
+    # Ensure kernel size is odd
+    kernel_size = int(kernel_size) | 1  # Ensures it's odd
+    return gaussian_filter(image, sigma=sigma, mode='nearest')
+
+# Image loading and noise adding
+def add_noise(image, noise_factor=0.5):
+    noisy_image = image + noise_factor * np.random.randn(*image.shape)
+    noisy_image = np.clip(noisy_image, 0, 255)
+    return noisy_image
+
+# Load and prepare the image
+image_path = "path_to_image.jpg"  # Replace with your image path
+original_image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+original_image = np.float32(original_image)
+
+# Add noise to the image
+noisy_image = add_noise(original_image)
+
+# Set parameters for Cuckoo Search
+num_nests = 10
+max_iter = 50
+lower_bound = [0.5, 3]  # Lower bounds for sigma and kernel size
+upper_bound = [5.0, 15]  # Upper bounds for sigma and kernel size
+
+# Run Cuckoo Search for image denoising
+denoised_image, best_params, best_fitness = cuckoo_search_image_denoising(
+    original_image, noisy_image, num_nests, max_iter, lower_bound, upper_bound)
+
+# Show the results
+print(f"Best Filter Parameters (sigma, kernel size): {best_params}")
+print(f"Best Fitness (MSE): {best_fitness}")
+
+# Convert denoised image to uint8 for display
+denoised_image = np.uint8(denoised_image)
+
+cv2.imshow("Original Image", np.uint8(original_image))
+cv2.imshow("Noisy Image", np.uint8(noisy_image))
+cv2.imshow("Denoised Image", denoised_image)
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
