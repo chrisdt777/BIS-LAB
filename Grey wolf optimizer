@@ -1,0 +1,71 @@
+import numpy as np
+import random
+
+# Objective function to optimize (example: Sphere function)
+def objective_function(x):
+    return np.sum(x ** 2)
+
+# Grey Wolf Optimizer (GWO)
+def grey_wolf_optimizer(f, bounds, num_wolves=20, max_iter=100, dim=2):
+    # Initialize wolves' positions randomly within bounds
+    wolves = np.random.uniform(bounds[0], bounds[1], (num_wolves, dim))
+    
+    # Initialize alpha, beta, delta
+    alpha, beta, delta = None, None, None
+    
+    for iteration in range(max_iter):
+        # Evaluate fitness of all wolves
+        fitness = np.array([f(wolf) for wolf in wolves])
+        
+        # Update alpha, beta, delta (best three wolves)
+        sorted_indices = np.argsort(fitness)
+        alpha, beta, delta = wolves[sorted_indices[:3]]
+        
+        # Update coefficient a
+        a = 2 * (1 - iteration / max_iter)
+        
+        # Update each wolf's position
+        for i in range(num_wolves):
+            A1, C1 = a * (2 * random.random() - 1), 2 * random.random()
+            A2, C2 = a * (2 * random.random() - 1), 2 * random.random()
+            A3, C3 = a * (2 * random.random() - 1), 2 * random.random()
+
+            D_alpha = abs(C1 * alpha - wolves[i])
+            D_beta = abs(C2 * beta - wolves[i])
+            D_delta = abs(C3 * delta - wolves[i])
+
+            X1 = alpha - A1 * D_alpha
+            X2 = beta - A2 * D_beta
+            X3 = delta - A3 * D_delta
+
+            wolves[i] = (X1 + X2 + X3) / 3
+
+            # Ensure the wolf's position is within bounds
+            wolves[i] = np.clip(wolves[i], bounds[0], bounds[1])
+
+        # Print progress
+        print(f"Iteration {iteration + 1}: Best Fitness = {fitness[sorted_indices[0]]:.4f}")
+
+    # Return the best solution (alpha)
+    best_fitness = fitness[sorted_indices[0]]
+    return alpha, best_fitness
+
+# Interactive user input
+if __name__ == "__main__":
+    print("Grey Wolf Optimizer (GWO)")
+
+    # User inputs
+    num_wolves = int(input("Enter the number of wolves in the population: "))
+    max_iter = int(input("Enter the maximum number of iterations: "))
+    dim = int(input("Enter the number of dimensions: "))
+    bounds_min = float(input("Enter the lower bound for the search space: "))
+    bounds_max = float(input("Enter the upper bound for the search space: "))
+
+    bounds = [bounds_min, bounds_max]
+
+    # Run the optimizer
+    best_position, best_fitness = grey_wolf_optimizer(objective_function, bounds, num_wolves=num_wolves, max_iter=max_iter, dim=dim)
+
+    print("\nBest Solution:")
+    print(f"Position: {best_position}")
+    print(f"Fitness: {best_fitness}")
